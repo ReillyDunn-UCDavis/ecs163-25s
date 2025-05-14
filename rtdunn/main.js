@@ -1,7 +1,14 @@
+// ChatGPT was used to get the basic skeleton of the code for the graphs, and I modified things like position, size, color, text, etc, etc.
+
 const svg = d3.select("svg");
+
 const width = window.innerWidth;
 const height = window.innerHeight;
 
+// The dashboard should work if the user changes window size
+window.addEventListener('resize', () => location.reload());
+
+// Load data and call funcs to draw the graphs
 d3.csv("data/music.csv").then(rawData =>{
     // One person who responded to the survey that generated this data entered 9999999 for BPM
     // which is obviously unrealistic, so I'm taking that one out
@@ -12,7 +19,9 @@ d3.csv("data/music.csv").then(rawData =>{
     drawSankeyChart(rawData);
 });
 
+// This function creates the heatmap
 function drawHeatmap(rawData){
+    // Pull in the relevant data
     const conditions = ["Anxiety", "Depression", "Insomnia", "OCD"];
     const genres = Array.from(new Set(rawData.map(d => d["Fav genre"]).filter(Boolean)));
 
@@ -25,7 +34,7 @@ function drawHeatmap(rawData){
         });
     });
 
-    // Compute values in the heatmap
+    // Count values in the data
     rawData.forEach(d => {
         const genre = d["Fav genre"];
         if (!genre || !genres.includes(genre)) return;
@@ -38,6 +47,7 @@ function drawHeatmap(rawData){
         });
     });
 
+    // Compute averages to be used in graph
     const heatmapData = [];
     genres.forEach((genre, i) => {
         conditions.forEach((cond, j) => {
@@ -47,19 +57,23 @@ function drawHeatmap(rawData){
         });
     });
 
-    const heatMargin = { top: 400, left: 100 };
-    const cellWidth = 40;
-    const cellHeight = 40;
+    // positioning stuff
+    const heatMargin = { top: height * 0.55, left: width * 0.05 };
+    const cellWidth = (width * 0.55) / genres.length;
+    const cellHeight = (height * 0.3) / conditions.length;
 
     const x = d3.scaleBand().domain(genres).range([heatMargin.left, heatMargin.left + genres.length * cellWidth]).padding(0.05);
     const y = d3.scaleBand().domain(conditions).range([heatMargin.top, heatMargin.top + conditions.length * cellHeight]).padding(0.05);
     
+    // Color scale. I tried a few different versions but ultimately
+    // grayscale seemed to be the clearest
     const color = d3.scaleLinear()
         .domain([0, 10])
         .range(["#FFFFFF", "#000000"])
 
     const heatmapGroup = svg.append("g").attr("class", "heatmap");
 
+    // Draw each box in the heatmap
     heatmapGroup.selectAll("rect")
         .data(heatmapData)
         .enter()
@@ -71,6 +85,7 @@ function drawHeatmap(rawData){
         .attr("height", y.bandwidth())
         .attr("fill", d => d.value != null ? color(d.value) : "#ccc");
 
+    // Add the labels to the genres
     heatmapGroup.selectAll(".genreLabel")
         .data(genres)
         .enter()
@@ -81,6 +96,7 @@ function drawHeatmap(rawData){
         .attr("transform", d => `rotate(-45, ${x(d) + x.bandwidth() / 2}, ${heatMargin.top + conditions.length * cellHeight + 15})`)
         .text(d => d);
 
+    // Add the labels to the mental health conditions
     svg.selectAll(".conditionLabel")
         .data(conditions)
         .enter()
@@ -91,6 +107,7 @@ function drawHeatmap(rawData){
         .attr("alignment-baseline", "middle")
         .text(d => d);
     
+    // Add a label to the y axis
     heatmapGroup.append("text")
         .attr("x", 10)
         .attr("y", ((y.range()[0] + y.range()[1]) / 2) + 5)
@@ -99,6 +116,7 @@ function drawHeatmap(rawData){
         .style("font-size", "14px")
         .text("Severity of Mental Health Condition");
 
+    // Add a label to the x axis
     heatmapGroup.append("text")
         .attr("x", (x.range()[0] + x.range()[1]) / 2)
         .attr("y", heatMargin.top + conditions.length * cellHeight + 70)
@@ -106,6 +124,7 @@ function drawHeatmap(rawData){
         .style("font-size", "14px")
         .text("Favorite Music Genre");
 
+    // Chart title
     heatmapGroup.append("text")
         .attr("x", (x.range()[0] + x.range()[1]) / 2)
         .attr("y", heatMargin.top + conditions.length * cellHeight + 110)
@@ -114,6 +133,7 @@ function drawHeatmap(rawData){
         .style("font-weight", "bold")
         .text("Severity of Anxiety, Depression, OCD, and Insomnia by Favorite Genre of Music")
 
+    // Chart legend (which is pretty simple since it's just a scale from white to black)
     heatmapGroup.append("text")
         .attr("x", (x.range()[0] + x.range()[1]) / 2)
         .attr("y", heatMargin.top + conditions.length * cellHeight + 130)
@@ -123,7 +143,9 @@ function drawHeatmap(rawData){
 
 }
 
+// Function to draw the star chart
 function drawStarChart(rawData) {
+    // Set up data to be used
     const groups = ["Improve", "No effect", "Worsen"];
     const dimensions = ["Anxiety", "Depression", "Insomnia", "OCD", "Hours per day", "Age", "BPM"];
     const dimensionLabels = {
@@ -141,6 +163,7 @@ function drawStarChart(rawData) {
         "Worsen": "#ff0000"
     };
 
+    // Compute averages from the data
     const averages = groups.map(effect => {
         const groupData = rawData.filter(d => 
             d["Music effects"] === effect &&
@@ -155,6 +178,7 @@ function drawStarChart(rawData) {
         return { effect, values };
     });
 
+    // Figure out the scale to be used based on the maximum value seen in the dataset
     const scale = {};
     dimensions.forEach(dim => {
         const allValues = rawData.map(d => +d[dim]).filter(v => !isNaN(v));
@@ -163,13 +187,14 @@ function drawStarChart(rawData) {
             .range([0, 100]);
     });
 
-    const radarWidth = 300, radarHeight = 300, radius = 100;
+    // Parameters for the graph
+    const radius = 200;
     const angleSlice = (2 * Math.PI) / dimensions.length;
-
     const radarGroup = svg.append("g")
         .attr("class", "star-chart")
-        .attr("transform", `translate(${1000}, ${525})`);
+        .attr("transform", `translate(${width * 0.75}, ${height * 0.75})`);
     
+    // Draw the axes and labels of the graph
      dimensions.forEach((dim, i) => {
         const angle = i * angleSlice;
         const x = radius * Math.cos(angle - Math.PI / 2);
@@ -192,13 +217,14 @@ function drawStarChart(rawData) {
 
     });
 
+    // Create a polygon with corners at the axes for each of the 3 groups
     averages.forEach(group => {
         const points = dimensions.map((dim, i) => {
             const angle = i * angleSlice;
             const val = scale[dim](group.values[dim]);
             return [
-                val * Math.cos(angle - Math.PI / 2),
-                val * Math.sin(angle - Math.PI / 2)
+                val * Math.cos(angle - Math.PI / 2) * 2.7,
+                val * Math.sin(angle - Math.PI / 2) * 2.7
             ];
         });
 
@@ -208,48 +234,43 @@ function drawStarChart(rawData) {
             .attr("stroke", colors[group.effect])
             .attr("stroke-width", 2);
     });
-    const legend = svg.append("g")
-        .attr("transform", `translate(${1200}, ${450})`);
 
-    legend.append("text")
-        .attr("x", 0)
-        .attr("y", -10)
-        .text("Effect of Music on Mood")
-        .style("font-weight", "bold")
-        .style("font-size", "14px");
+    // Legend
+    svg.append("g")
+        .attr("transform", `translate(${width * 0.85}, ${height * 0.7})`)
+        .call(g => {
+            g.append("text")
+                .text("Effect of Music on Mood")
+                .attr("y", -10).style("font-weight", "bold").style("font-size", "14px");
+            groups.forEach((group, i) => {
+                const row = g.append("g").attr("transform", `translate(0, ${i * 30})`);
+                row.append("rect").attr("width", 12).attr("height", 12).attr("fill", colors[group]);
+                row.append("text").attr("x", 18).attr("y", 10).style("font-size", "12px").text(group);
+            });
+        });
 
-    groups.forEach((g, i) => {
-        const row = legend.append("g").attr("transform", `translate(0, ${i * 20})`);
-        row.append("rect")
-            .attr("width", 12)
-            .attr("height", 12)
-            .attr("fill", colors[g]);
-        row.append("text")
-            .attr("x", 18)
-            .attr("y", 10)
-            .text(g)
-            .style("font-size", "12px");
-    });
-
+    // Graph title
     svg.append("text")
-        .attr("x", 1200)
-        .attr("y", 670)
+        .attr("x", width * 0.75)
+        .attr("y", height * 0.95)
         .attr("text-anchor", "middle")
         .style("font-size", "18px")
         .style("font-weight", "bold")
         .text("Comparison of Statistics by Effect of Music on Mood")
 }
 
+// Function to draw the Sankey
 function drawSankeyChart(rawData) {
+    // Basic setup
     const effects = ["Improve", "No effect", "Worsen"];
     const genreEffectCounts = {};
-
     const effectColors = {
         "Improve": "#00aa00",
         "No effect": "#ab8400",
         "Worsen": "#ff0000"
     };
 
+    // Pull in data
     rawData.forEach(d => {
         const genre = d["Fav genre"];
         const effect = d["Music effects"];
@@ -262,6 +283,7 @@ function drawSankeyChart(rawData) {
         }
     });
 
+    // Setting up data structure for the sankey
     const nodes = [];
     const nodeMap = new Map();
     let nodeIndex = 0;
@@ -289,17 +311,18 @@ function drawSankeyChart(rawData) {
         });
     });
 
+    // Create the sankey layout
     const sankey = d3.sankey()
         .nodeWidth(20)
         .nodePadding(10)
-        .extent([[150, 60], [width - 100, height - 310]]);
-
+        .extent([[width * 0.05, height * 0.05], [width * 0.95, height * 0.5]]);
 
     const sankeyData = sankey({
         nodes: nodes.map(d => Object.assign({}, d)),
         links: links.map(d => Object.assign({}, d))
     });
 
+    // Graph title
     svg.append("text")
         .attr("x", width / 2)
         .attr("y", 50)
@@ -308,10 +331,11 @@ function drawSankeyChart(rawData) {
         .style("font-weight", "bold")
         .text("How Do Different Music Genres Effect the Mood of Patients?")
 
+    // Create the sankey
     const sankeyGroup = svg.append("g")
-    .attr("class", "sankey")
-    .attr("transform", "translate(0, 0)"); // optional, can leave as is
+        .attr("class", "sankey");
 
+    // Positioning the columns
     const genreX = d3.min(sankeyData.nodes.filter(d => !effects.includes(d.name)), d => d.x0);
     const effectX = d3.min(sankeyData.nodes.filter(d => effects.includes(d.name)), d => d.x0);
 
@@ -323,7 +347,6 @@ function drawSankeyChart(rawData) {
         .style("font-size", "16px")
         .style("font-weight", "bold")
         .text("Favorite Genre");
-
     sankeyGroup.append("text")
         .attr("x", effectX - 70)
         .attr("y", 50)
@@ -332,6 +355,7 @@ function drawSankeyChart(rawData) {
         .style("font-weight", "bold")
         .text("Effect of Music on Mood");
 
+    // Draw the links between the nodes
     sankeyGroup.append("g")
         .selectAll("path")
         .data(sankeyData.links)
@@ -345,11 +369,11 @@ function drawSankeyChart(rawData) {
         .attr("stroke-opacity", 0.5)
         .attr("stroke-width", d => Math.max(1, d.width));
 
+    // Draw rectangles for the nodes
     const node = sankeyGroup.append("g")
         .selectAll("g")
         .data(sankeyData.nodes)
         .enter().append("g");
-
     node.append("rect")
         .attr("x", d => d.x0)
         .attr("y", d => d.y0)
@@ -360,6 +384,7 @@ function drawSankeyChart(rawData) {
         })
         .attr("stroke", "#000");
 
+    // Label each node
     node.append("text")
         .attr("x", d => d.x0 + 30)
         .attr("y", d => (d.y1 + d.y0) / 2)

@@ -23,12 +23,10 @@ d3.csv("data/music.csv").then(rawData =>{
 });
 
 // This function creates the heatmap
-function drawHeatmap(rawData){
-    // Pull in the relevant data
+function drawHeatmap(rawData) {
     const conditions = ["Anxiety", "Depression", "Insomnia", "OCD"];
     const genres = Array.from(new Set(rawData.map(d => d["Fav genre"]).filter(Boolean)));
 
-    // Prepare data structure for the heatmap
     const scores = {};
     genres.forEach(genre => {
         scores[genre] = {};
@@ -37,91 +35,76 @@ function drawHeatmap(rawData){
         });
     });
 
-    // Count values in the data
     rawData.forEach(d => {
         const genre = d["Fav genre"];
         if (!genre || !genres.includes(genre)) return;
 
         conditions.forEach(cond => {
             const val = +d[cond];
-            if (!isNaN(val)){
+            if (!isNaN(val)) {
                 scores[genre][cond].push(val);
             }
         });
     });
 
-    // Compute averages to be used in graph
     const heatmapData = [];
-    genres.forEach((genre, i) => {
-        conditions.forEach((cond, j) => {
+    genres.forEach(genre => {
+        conditions.forEach(cond => {
             const values = scores[genre][cond];
             const avg = values.length > 0 ? d3.mean(values) : null;
             heatmapData.push({ genre, condition: cond, value: avg });
         });
     });
 
-    // positioning stuff
     const heatMargin = { top: height * 0.55, left: width * 0.05 };
     const cellWidth = (width * 0.55) / genres.length;
     const cellHeight = (height * 0.3) / conditions.length;
 
     const x = d3.scaleBand().domain(genres).range([heatMargin.left, heatMargin.left + genres.length * cellWidth]).padding(0.05);
-    const y = d3.scaleBand().domain(conditions).range([heatMargin.top, heatMargin.top + conditions.length * cellHeight]).padding(0.05);
-    
-    // Color scale. I tried a few different versions but ultimately
-    // grayscale seemed to be the clearest
-    const color = d3.scaleLinear()
-        .domain([0, 10])
-        .range(["#FFFFFF", "#000000"])
+    let currentY = d3.scaleBand().domain(conditions).range([heatMargin.top, heatMargin.top + conditions.length * cellHeight]).padding(0.05);
+
+    const color = d3.scaleLinear().domain([0, 10]).range(["#FFFFFF", "#000000"]);
 
     const heatmapGroup = svg.append("g").attr("class", "heatmap");
 
-    // Draw each box in the heatmap
+    // Draw initial cells
     heatmapGroup.selectAll("rect")
         .data(heatmapData)
         .enter()
         .append("rect")
         .attr("class", "cell")
         .attr("x", d => x(d.genre))
-        .attr("y", d => y(d.condition))
+        .attr("y", d => currentY(d.condition))
         .attr("width", x.bandwidth())
-        .attr("height", y.bandwidth())
+        .attr("height", currentY.bandwidth())
         .attr("fill", d => d.value != null ? color(d.value) : "#ccc");
 
-    // Add the labels to the genres
-    heatmapGroup.selectAll(".genreLabel")
-        .data(genres)
-        .enter()
-        .append("text")
-        .attr("x", d => x(d) + x.bandwidth() / 2)
-        .attr("y", heatMargin.top + conditions.length * cellHeight + 15)
-        .attr("text-anchor", "end")
-        .style("font-size", "10px")
-        .attr("transform", d => `rotate(-45, ${x(d) + x.bandwidth() / 2}, ${heatMargin.top + conditions.length * cellHeight + 15})`)
-        .text(d => d);
+    // Titles
+    heatmapGroup.append("text")
+        .attr("x", (x.range()[0] + x.range()[1]) / 2)
+        .attr("y", heatMargin.top + conditions.length * cellHeight + 0.125 * height)
+        .attr("text-anchor", "middle")
+        .style("font-size", "16px")
+        .style("font-weight", "bold")
+        .text("Severity of Anxiety, Depression, OCD, and Insomnia by Favorite Genre of Music");
 
-    // Add the labels to the mental health conditions
-    svg.selectAll(".conditionLabel")
-        .data(conditions)
-        .enter()
-        .append("text")
-        .attr("x", heatMargin.left + 0.0001 * width)
-        .attr("y", d => y(d) + y.bandwidth() / 2)
-        .attr("text-anchor", "end")
-        .style("font-size", "10px")
-        .attr("alignment-baseline", "middle")
-        .text(d => d);
-    
-    // Add a label to the y axis
+    heatmapGroup.append("text")
+        .attr("x", (x.range()[0] + x.range()[1]) / 2)
+        .attr("y", heatMargin.top + conditions.length * cellHeight + 0.145 * height)
+        .attr("text-anchor", "middle")
+        .style("font-size", "15px")
+        .text("(Darker = More Severe, Lighter = Less Severe)");
+
+    // Y-axis label
     heatmapGroup.append("text")
         .attr("x", 10)
-        .attr("y", ((y.range()[0] + y.range()[1]) / 2) + 0.01 * height)
+        .attr("y", ((currentY.range()[0] + currentY.range()[1]) / 2) + 0.01 * height)
         .attr("text-anchor", "middle")
-        .attr("transform", `rotate(-90, 10, ${(y.range()[0] + y.range()[1]) / 2})`)
+        .attr("transform", `rotate(-90, 10, ${(currentY.range()[0] + currentY.range()[1]) / 2})`)
         .style("font-size", "14px")
         .text("Severity of Mental Health Condition");
 
-    // Add a label to the x axis
+    // X-axis label
     heatmapGroup.append("text")
         .attr("x", (x.range()[0] + x.range()[1]) / 2)
         .attr("y", heatMargin.top + conditions.length * cellHeight + 0.1 * height)
@@ -129,23 +112,131 @@ function drawHeatmap(rawData){
         .style("font-size", "14px")
         .text("Favorite Music Genre");
 
-    // Chart title
-    heatmapGroup.append("text")
-        .attr("x", (x.range()[0] + x.range()[1]) / 2)
-        .attr("y", heatMargin.top + conditions.length * cellHeight + 0.125 * height)
-        .attr("text-anchor", "middle")
-        .style("font-size", "16px")
-        .style("font-weight", "bold")
-        .text("Severity of Anxiety, Depression, OCD, and Insomnia by Favorite Genre of Music")
+    renderHeatmap(genres);
+    renderRows(conditions);
 
-    // Chart legend (which is pretty simple since it's just a scale from white to black)
-    heatmapGroup.append("text")
-        .attr("x", (x.range()[0] + x.range()[1]) / 2)
-        .attr("y", heatMargin.top + conditions.length * cellHeight + 0.145 * height)
-        .attr("text-anchor", "middle")
-        .style("font-size", "15px")
-        .text("(Darker = More Severe, Lighter = Less Severe)")
+    hasSorted = false; hasWaitedTenSeconds = false;
 
+    function renderHeatmap(orderedGenres) {
+        const newX = d3.scaleBand().domain(orderedGenres).range([heatMargin.left, heatMargin.left + orderedGenres.length * cellWidth]).padding(0.05);
+
+        const genreLabels = svg.selectAll(".genreLabel")
+            .data(orderedGenres, d => d);
+
+        genreLabels.transition()
+            .duration(750)
+            .attr("x", d => newX(d) + newX.bandwidth() / 2)
+            .attr("transform", d => `rotate(-45, ${newX(d) + newX.bandwidth() / 2}, ${heatMargin.top + conditions.length * cellHeight + 15})`);
+
+        genreLabels.enter()
+            .append("text")
+            .attr("class", "genreLabel")
+            .attr("x", d => newX(d) + newX.bandwidth() / 2)
+            .attr("y", heatMargin.top + conditions.length * cellHeight + 15)
+            .attr("text-anchor", "end")
+            .style("font-size", "10px")
+            .attr("transform", d => `rotate(-45, ${newX(d) + newX.bandwidth() / 2}, ${heatMargin.top + conditions.length * cellHeight + 15})`)
+            .text(d => d)
+            .style("cursor", "pointer")
+            .on("click", function(clickedGenre) {
+                hasSorted = true; tryRemoveInstruction();
+
+                console.log("clicked on genre", clickedGenre);
+                const sortedConditions = conditions.slice().sort((a, b) => {
+                    const valA = heatmapData.find(d => d.genre === clickedGenre && d.condition === a)?.value ?? 0;
+                    const valB = heatmapData.find(d => d.genre === clickedGenre && d.condition === b)?.value ?? 0;
+                    return d3.descending(valA, valB);
+                });
+                renderRows(sortedConditions);
+            });
+
+        // Update cells
+        svg.selectAll(".cell")
+            .transition()
+            .duration(750)
+            .attr("x", d => newX(d.genre))
+            .attr("width", newX.bandwidth());
+    }
+
+    function renderRows(orderedConditions) {
+        currentY = d3.scaleBand().domain(orderedConditions).range([heatMargin.top, heatMargin.top + orderedConditions.length * cellHeight]).padding(0.05);
+
+        svg.selectAll(".cell")
+            .transition()
+            .duration(750)
+            .attr("y", d => currentY(d.condition))
+            .attr("height", currentY.bandwidth());
+
+        svg.selectAll(".conditionLabel")
+            .transition()
+            .duration(750)
+            .attr("y", d => currentY(d) + currentY.bandwidth() / 2);
+    }
+
+    // Add condition labels with click-to-sort genres
+    svg.selectAll(".conditionLabel")
+        .data(conditions)
+        .enter()
+        .append("text")
+        .attr("class", "conditionLabel")
+        .attr("x", heatMargin.left + 0.0001 * width)
+        .attr("y", d => currentY(d) + currentY.bandwidth() / 2)
+        .attr("text-anchor", "end")
+        .style("font-size", "10px")
+        .attr("alignment-baseline", "middle")
+        .text(d => d)
+        .style("cursor", "pointer")
+        .on("click", function(clickedCondition) {
+            hasSorted = true; tryRemoveInstruction();
+
+            console.log("clicked on", clickedCondition);
+            const sortedGenres = genres.slice().sort((a, b) => {
+                const valA = heatmapData.find(d => d.genre === a && d.condition === clickedCondition)?.value ?? 0;
+                const valB = heatmapData.find(d => d.genre === b && d.condition === clickedCondition)?.value ?? 0;
+                return d3.descending(valA, valB);
+            });
+            renderHeatmap(sortedGenres);
+        });
+
+    const instructionBox = svg.append("g")
+        .attr("class", "instruction-group");
+    const boxWidth = width * 0.125;
+    const boxHeight = height * 0.04;
+    const boxX = width * 0.275;
+    const boxY = height * 0.5;
+
+    // Draw instruction box
+    instructionBox.append("rect")
+        .attr("x", boxX)
+        .attr("y", boxY)
+        .attr("width", boxWidth)
+        .attr("height", boxHeight)
+        .attr("fill", "white")
+        .attr("stroke", "black")
+        .attr("rx", 6)
+        .attr("ry", 6);
+
+    // Instruction text
+    instructionBox.append("text")
+        .attr("x", boxX + boxWidth / 2)
+        .attr("y", boxY + boxHeight / 2 + 4)
+        .attr("text-anchor", "middle")
+        .style("font-size", Math.min(width, height) * 0.015)
+        .style("fill", "black")
+        .text("Click on axis labels to sort.");
+
+
+    // Hide the instructions after the user has interacted, and 10 seconds have passed
+    function tryRemoveInstruction() {
+        console.log("attempting to remove instruction");
+        if (hasSorted && hasWaitedTenSeconds) {
+            instructionBox.transition().duration(500).style("opacity", 0).remove();
+        }
+    }
+    setTimeout(() => {
+        hasWaitedTenSeconds = true;
+        tryRemoveInstruction();
+    }, 10000);
 }
 
 // Function to draw the star chart
@@ -530,7 +621,7 @@ function drawSankeyChart(rawData) {
     // Instruction box
     const instructionGroup = svg.append("g")
         .attr("class", "instruction-group");
-    const boxWidth = width * 0.1;
+    const boxWidth = width * 0.125;
     const boxHeight = height * 0.04;
     const boxX = width * 0.07;
     const boxY = height * 0.12;
@@ -552,7 +643,7 @@ function drawSankeyChart(rawData) {
         .attr("y", boxY + boxHeight / 2 + 4)
         .attr("text-anchor", "middle")
         .style("font-size", Math.min(width, height) * 0.015)
-        .style("fill", "#333")
+        .style("fill", "black")
         .text("<== Mouse over the Sankey nodes");
 
     // Hide the box

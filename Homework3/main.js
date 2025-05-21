@@ -1,4 +1,5 @@
 // ChatGPT was used to get the basic skeleton of the code for the graphs, and I modified things like position, size, color, text, etc, etc.
+// This version adds some interactivity to the Sankey and Star charts.
 
 const svg = d3.select("svg");
 
@@ -15,8 +16,10 @@ d3.csv("data/music.csv").then(rawData =>{
     rawData = rawData.filter(d => +d["BPM"] < 1000);
 
     drawHeatmap(rawData);
-    drawStarChart(rawData);
+    
     drawSankeyChart(rawData);
+
+    drawStarChart(rawData);
 });
 
 // This function creates the heatmap
@@ -93,6 +96,7 @@ function drawHeatmap(rawData){
         .attr("x", d => x(d) + x.bandwidth() / 2)
         .attr("y", heatMargin.top + conditions.length * cellHeight + 15)
         .attr("text-anchor", "end")
+        .style("font-size", "10px")
         .attr("transform", d => `rotate(-45, ${x(d) + x.bandwidth() / 2}, ${heatMargin.top + conditions.length * cellHeight + 15})`)
         .text(d => d);
 
@@ -101,16 +105,17 @@ function drawHeatmap(rawData){
         .data(conditions)
         .enter()
         .append("text")
-        .attr("x", heatMargin.left - 10)
+        .attr("x", heatMargin.left + 0.0001 * width)
         .attr("y", d => y(d) + y.bandwidth() / 2)
         .attr("text-anchor", "end")
+        .style("font-size", "10px")
         .attr("alignment-baseline", "middle")
         .text(d => d);
     
     // Add a label to the y axis
     heatmapGroup.append("text")
         .attr("x", 10)
-        .attr("y", ((y.range()[0] + y.range()[1]) / 2) + 5)
+        .attr("y", ((y.range()[0] + y.range()[1]) / 2) + 0.01 * height)
         .attr("text-anchor", "middle")
         .attr("transform", `rotate(-90, 10, ${(y.range()[0] + y.range()[1]) / 2})`)
         .style("font-size", "14px")
@@ -119,7 +124,7 @@ function drawHeatmap(rawData){
     // Add a label to the x axis
     heatmapGroup.append("text")
         .attr("x", (x.range()[0] + x.range()[1]) / 2)
-        .attr("y", heatMargin.top + conditions.length * cellHeight + 70)
+        .attr("y", heatMargin.top + conditions.length * cellHeight + 0.1 * height)
         .attr("text-anchor", "middle")
         .style("font-size", "14px")
         .text("Favorite Music Genre");
@@ -127,16 +132,16 @@ function drawHeatmap(rawData){
     // Chart title
     heatmapGroup.append("text")
         .attr("x", (x.range()[0] + x.range()[1]) / 2)
-        .attr("y", heatMargin.top + conditions.length * cellHeight + 110)
+        .attr("y", heatMargin.top + conditions.length * cellHeight + 0.125 * height)
         .attr("text-anchor", "middle")
-        .style("font-size", "18px")
+        .style("font-size", "16px")
         .style("font-weight", "bold")
         .text("Severity of Anxiety, Depression, OCD, and Insomnia by Favorite Genre of Music")
 
     // Chart legend (which is pretty simple since it's just a scale from white to black)
     heatmapGroup.append("text")
         .attr("x", (x.range()[0] + x.range()[1]) / 2)
-        .attr("y", heatMargin.top + conditions.length * cellHeight + 130)
+        .attr("y", heatMargin.top + conditions.length * cellHeight + 0.145 * height)
         .attr("text-anchor", "middle")
         .style("font-size", "15px")
         .text("(Darker = More Severe, Lighter = Less Severe)")
@@ -188,7 +193,7 @@ function drawStarChart(rawData) {
     });
 
     // Parameters for the graph
-    const radius = 200;
+    const radius = width / 10;
     const angleSlice = (2 * Math.PI) / dimensions.length;
     const radarGroup = svg.append("g")
         .attr("class", "star-chart")
@@ -208,8 +213,8 @@ function drawStarChart(rawData) {
             .attr("stroke", "#ccc");
 
         radarGroup.append("text")
-            .attr("x", x * 1.2)
-            .attr("y", y * 1.2)
+            .attr("x", x * 1.1)
+            .attr("y", y * 1.1)
             .attr("text-anchor", "middle")
             .attr("alignment-baseline", "middle")
             .style("font-size", "10px")
@@ -223,8 +228,8 @@ function drawStarChart(rawData) {
             const angle = i * angleSlice;
             const val = scale[dim](group.values[dim]);
             return [
-                val * Math.cos(angle - Math.PI / 2) * 2.7,
-                val * Math.sin(angle - Math.PI / 2) * 2.7
+                val * Math.cos(angle - Math.PI / 2) * (width / 1000),
+                val * Math.sin(angle - Math.PI / 2) * (width / 1000)
             ];
         });
 
@@ -237,7 +242,7 @@ function drawStarChart(rawData) {
 
     // Legend
     svg.append("g")
-        .attr("transform", `translate(${width * 0.85}, ${height * 0.7})`)
+        .attr("transform", `translate(${width * 0.89}, ${height * 0.7})`)
         .call(g => {
             g.append("text")
                 .text("Effect of Music on Mood")
@@ -252,11 +257,116 @@ function drawStarChart(rawData) {
     // Graph title
     svg.append("text")
         .attr("x", width * 0.75)
-        .attr("y", height * 0.95)
+        .attr("y", height * 0.45)
         .attr("text-anchor", "middle")
         .style("font-size", "18px")
         .style("font-weight", "bold")
         .text("Comparison of Statistics by Effect of Music on Mood")
+
+    // Zoom In Effect
+    const lensRadius = 200;
+
+    // Set up the magnifier lens
+    svg.append("clipPath")
+        .attr("id", "lens-clip")
+    .append("circle")
+        .attr("r", lensRadius);
+    const lensGroup = svg.append("g")
+        .attr("class", "lens")
+        .style("display", "none");
+    lensGroup.append("circle")
+        .attr("r", lensRadius)
+        .attr("fill", "white")
+        .attr("stroke", "black")
+        .attr("stroke-width", 1)
+        .attr("fill-opacity", 1);
+    const lensContent = lensGroup.append("g")
+        .attr("clip-path", "url(#lens-clip)");
+    const overlayOffset = radius * 1.5;
+
+    // Set up a "hitbox" where the mouse can hover over to zoom in
+    radarGroup.append("rect")
+        .attr("x", -overlayOffset)
+        .attr("y", -overlayOffset)
+        .attr("width", radius * 3)
+        .attr("height", radius * 3)
+        .style("fill", "none")
+        .style("pointer-events", "all")
+        .on("mousemove", function(event) {
+            onMouseMove.call(this, event);
+        })
+        .on("mouseleave", () => lensGroup.style("display", "none"));
+
+    let hasMagnified = false;
+    let hasWaitedTenSeconds = false;
+
+    // Function for the interactivity
+    function onMouseMove() {
+        // Logic for disappearing the instruction box
+        if (!hasMagnified) {
+            hasMagnified = true;
+            tryHideInstruction();
+        }
+
+        // get the mouse position
+        const [svgX, svgY] = d3.mouse(svg.node());
+
+        // Convert coordinates on the zoomable area to where the lens content is
+        const localX = svgX - width * 0.75;
+        const localY = svgY - height * 0.75;
+
+        // Draw the lens
+        lensGroup
+            .style("display", null)
+            .attr(
+            "transform",
+            `translate(${width * 0.5}, ${height * 0.5})`
+            );
+
+        // Clone the part of the graph
+        lensContent.selectAll("*").remove();
+        const clone = radarGroup.node().cloneNode(true);
+        clone.removeAttribute("transform");
+        lensContent.node().appendChild(clone);
+
+        // Draw the magnification
+        const scaleFactor = 7;
+        d3.select(clone)
+            .attr(
+            "transform",
+            `translate(${-localX * scaleFactor}, ${-localY * scaleFactor}) scale(${scaleFactor})`
+            );
+    }
+
+    // Instruction Box
+    const instructionBox = svg.append("foreignObject")
+        .attr("x", width * 0.75 - 100)
+        .attr("y", height * 0.75 - radius - 60)
+        .attr("width", 200)
+        .attr("height", 40)
+        .attr("class", "instruction-box")
+        .append("xhtml:div")
+        .style("background", "white")
+        .style("border", "1px solid black")
+        .style("border-radius", "8px")
+        .style("padding", "6px")
+        .style("font-size", "12px")
+        .style("text-align", "center")
+        .style("box-shadow", "0 2px 4px rgba(0,0,0,0.2)")
+        .style("pointer-events", "none")
+        .text("Mouse over the Star Chart.");
+
+    // Hide the instructions after the user has interacted, and 10 seconds have passed
+    function tryHideInstruction() {
+        if (hasMagnified && hasWaitedTenSeconds) {
+            instructionBox.transition().duration(500).style("opacity", 0).remove();
+        }
+    }
+    setTimeout(() => {
+        hasWaitedTenSeconds = true;
+        tryHideInstruction();
+    }, 10000);
+
 }
 
 // Function to draw the Sankey
@@ -288,6 +398,7 @@ function drawSankeyChart(rawData) {
     const nodeMap = new Map();
     let nodeIndex = 0;
 
+    // Get the nodes
     function getNode(name) {
         if (!nodeMap.has(name)) {
             nodeMap.set(name, nodeIndex++);
@@ -296,6 +407,7 @@ function drawSankeyChart(rawData) {
         return nodeMap.get(name);
     }
 
+    // Calculate the links
     const links = [];
     Object.entries(genreEffectCounts).forEach(([genre, effectsMap]) => {
         const genreIdx = getNode(genre);
@@ -316,7 +428,6 @@ function drawSankeyChart(rawData) {
         .nodeWidth(20)
         .nodePadding(10)
         .extent([[width * 0.05, height * 0.05], [width * 0.95, height * 0.5]]);
-
     const sankeyData = sankey({
         nodes: nodes.map(d => Object.assign({}, d)),
         links: links.map(d => Object.assign({}, d))
@@ -325,7 +436,7 @@ function drawSankeyChart(rawData) {
     // Graph title
     svg.append("text")
         .attr("x", width / 2)
-        .attr("y", 50)
+        .attr("y", height * 0.03)
         .attr("text-anchor", "middle")
         .style("font-size", "18px")
         .style("font-weight", "bold")
@@ -341,15 +452,15 @@ function drawSankeyChart(rawData) {
 
     // Add group labels
     sankeyGroup.append("text")
-        .attr("x", genreX - 50)
-        .attr("y", 50)
+        .attr("x", genreX - width * 0.01)
+        .attr("y", height * 0.03)
         .attr("text-anchor", "center")
         .style("font-size", "16px")
         .style("font-weight", "bold")
         .text("Favorite Genre");
     sankeyGroup.append("text")
-        .attr("x", effectX - 70)
-        .attr("y", 50)
+        .attr("x", effectX - width * 0.07)
+        .attr("y", height * 0.03)
         .attr("text-anchor", "center")
         .style("font-size", "16px")
         .style("font-weight", "bold")
@@ -375,7 +486,6 @@ function drawSankeyChart(rawData) {
         .selectAll("g")
         .data(sankeyData.nodes)
         .enter().append("g");
-          
     node.append("rect")
         .attr("x", d => d.x0)
         .attr("y", d => d.y0)
@@ -385,187 +495,77 @@ function drawSankeyChart(rawData) {
             return effectColors[d.name] || "#999";
         })
         .attr("stroke", "#000")
+
+        // Function that highlights links connected to the node being moused over
+        // And makes the other links more transparent
         .on("mouseenter", function(d) {
             const thisIndex = d.index;
+
+            hasHovered = true;
+            tryRemoveInstruction();
         
             d3.selectAll(".sankey-link")
                 .attr("stroke-opacity", function(link) {
                     return (link.source.index === thisIndex || link.target.index === thisIndex) ? 1 : 0.1;
                 });
         })
-        .on("mouseleave", function(event, d) {
+        // Resets to normal when mouse leaves
+        .on("mouseleave", function() {
             d3.selectAll(".sankey-link")
                 .attr("stroke-opacity", 0.5)
         });
         
     // Label each node
     node.append("text")
-        .attr("x", d => d.x0 + 30)
+        .attr("x", d => d.x0 + width * 0.015)
         .attr("y", d => (d.y1 + d.y0) / 2)
         .attr("dy", "0.35em")
         .attr("text-anchor", "start")
         .text(d => d.name)
         .filter(d => d.x0 < width / 2)
-        .attr("x", d => d.x1 - 30)
+        .attr("x", d => d.x1 - width * 0.015)
         .attr("text-anchor", "end");
-}
-
-/*
-function drawSankeyChart(rawData) {
-    // Basic setup
-    const effects = ["Improve", "No effect", "Worsen"];
-    const genreEffectCounts = {};
-    const effectColors = {
-        "Improve": "#00aa00",
-        "No effect": "#ab8400",
-        "Worsen": "#ff0000"
-    };
-
-    // Pull in data
-    rawData.forEach(d => {
-        const genre = d["Fav genre"];
-        const effect = d["Music effects"];
-
-        if (genre && effects.includes(effect)) {
-            if (!genreEffectCounts[genre]) {
-                genreEffectCounts[genre] = { "Improve": 0, "No effect": 0, "Worsen": 0 };
-            }
-            genreEffectCounts[genre][effect]++;
-        }
-    });
-
-    // Setting up data structure for the sankey
-    const nodes = [];
-    const nodeMap = new Map();
-    let nodeIndex = 0;
-
-    function getNode(name) {
-        if (!nodeMap.has(name)) {
-            nodeMap.set(name, nodeIndex++);
-            nodes.push({ name });
-        }
-        return nodeMap.get(name);
-    }
-
-    const links = [];
-    Object.entries(genreEffectCounts).forEach(([genre, effectsMap]) => {
-        const genreIdx = getNode(genre);
-        Object.entries(effectsMap).forEach(([effect, count]) => {
-            const effectIdx = getNode(effect);
-            if (count > 0) {
-                links.push({
-                    source: genreIdx,
-                    target: effectIdx,
-                    value: count
-                });
-            }
-        });
-    });
-
-    // Create the sankey layout
-    const sankey = d3.sankey()
-        .nodeWidth(20)
-        .nodePadding(10)
-        .extent([[width * 0.05, height * 0.05], [width * 0.95, height * 0.5]]);
-
-    const sankeyData = sankey({
-        nodes,
-        links: links.map(d => Object.assign({}, d))
-    });
-    console.log("Sankey nodes after layout:", sankeyData.nodes);
 
 
-    // Graph title
-    svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", 50)
+    // Instruction box
+    const instructionGroup = svg.append("g")
+        .attr("class", "instruction-group");
+    const boxWidth = width * 0.1;
+    const boxHeight = height * 0.04;
+    const boxX = width * 0.07;
+    const boxY = height * 0.12;
+
+    // Draw instruction box
+    instructionGroup.append("rect")
+        .attr("x", boxX)
+        .attr("y", boxY)
+        .attr("width", boxWidth)
+        .attr("height", boxHeight)
+        .attr("fill", "white")
+        .attr("stroke", "black")
+        .attr("rx", 6)
+        .attr("ry", 6);
+
+    // Instruction text
+    instructionGroup.append("text")
+        .attr("x", boxX + boxWidth / 2)
+        .attr("y", boxY + boxHeight / 2 + 4)
         .attr("text-anchor", "middle")
-        .style("font-size", "18px")
-        .style("font-weight", "bold")
-        .text("How Do Different Music Genres Effect the Mood of Patients?")
+        .style("font-size", Math.min(width, height) * 0.015)
+        .style("fill", "#333")
+        .text("<== Mouse over the Sankey nodes");
 
-    // Create the sankey
-    const sankeyGroup = svg.append("g")
-        .attr("class", "sankey");
+    // Hide the box
+    let hasHovered = false;
+    let fiveSecondsPassed = false;
 
-    // Positioning the columns
-    const genreX = d3.min(sankeyData.nodes.filter(d => !effects.includes(d.name)), d => d.x0);
-    const effectX = d3.min(sankeyData.nodes.filter(d => effects.includes(d.name)), d => d.x0);
-
-    // Add group labels
-    sankeyGroup.append("text")
-        .attr("x", genreX - 50)
-        .attr("y", 50)
-        .attr("text-anchor", "center")
-        .style("font-size", "16px")
-        .style("font-weight", "bold")
-        .text("Favorite Genre");
-    sankeyGroup.append("text")
-        .attr("x", effectX - 70)
-        .attr("y", 50)
-        .attr("text-anchor", "center")
-        .style("font-size", "16px")
-        .style("font-weight", "bold")
-        .text("Effect of Music on Mood");
-
-    // Draw the links between the nodes
-    sankeyGroup.append("g")
-        .selectAll("path")
-        .data(sankeyData.links)
-        .enter().append("path")
-        .attr("class", "sankey-link")
-        .attr("d", d3.sankeyLinkHorizontal())
-        .attr("fill", "none")
-        .attr("stroke", d => {
-            const effectNode = sankeyData.nodes[d.target.index];
-            return effectColors[effectNode.name] || "#999";
-        })
-        .attr("stroke-opacity", 0.5)
-        .attr("stroke-width", d => Math.max(1, d.width));
-
-        // Remove the <g> join for nodes entirely, and bind straight to rects:
-const nodeRects = sankeyGroup.append("g")
-.attr("class", "nodes")
-.selectAll("rect")
-.data(sankeyData.nodes)      // bind the actual node objects here
-.enter().append("rect")
-  .attr("x", d => d.x0)
-  .attr("y", d => d.y0)
-  .attr("height", d => d.y1 - d.y0)
-  .attr("width",  d => d.x1 - d.x0)
-  .attr("fill",   d => effectColors[d.name] || "#999")
-  .attr("stroke", "#000")
-  .on("mouseenter", function(event, d) {
-    // Now `d` is the full sankey node object
-    console.log("Hovered node data:", d);
-
-
-    d3.selectAll(".sankey-link")
-      .attr("stroke-opacity", link => {
-        console.log("link source", link.source.index);
-
-        link.source.index === d || link.target.index === d
-        ? 1
-        : 0.2
-      }
-        
-      );
-  })
-  .on("mouseleave", function() {
-    d3.selectAll(".sankey-link")
-      .attr("stroke-opacity", 0.5);
-  });
-
-// Then append labels, also bound to sankeyData.nodes:
-sankeyGroup.select("g.nodes")
-.selectAll("text")
-.data(sankeyData.nodes)
-.enter().append("text")
-  .attr("x", d => d.x0 < width/2 ? d.x1 - 6 : d.x0 + 6)
-  .attr("y", d => (d.y0 + d.y1) / 2)
-  .attr("dy", "0.35em")
-  .attr("text-anchor", d => d.x0 < width/2 ? "end" : "start")
-  .text(d => d.name);
-
+    function tryRemoveInstruction() {
+        if (hasHovered && fiveSecondsPassed) {
+            instructionGroup.transition().duration(500).style("opacity", 0).remove();
+        }
+    }
+    setTimeout(() => {
+        fiveSecondsPassed = true;
+        tryRemoveInstruction();
+    }, 10000);
 }
-*/

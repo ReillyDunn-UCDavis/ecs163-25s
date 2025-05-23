@@ -35,6 +35,7 @@ function drawHeatmap(rawData) {
         });
     });
 
+    // Basic data processing
     rawData.forEach(d => {
         const genre = d["Fav genre"];
         if (!genre || !genres.includes(genre)) return;
@@ -47,6 +48,7 @@ function drawHeatmap(rawData) {
         });
     });
 
+    // Compute heatmap values
     const heatmapData = [];
     genres.forEach(genre => {
         conditions.forEach(cond => {
@@ -56,6 +58,7 @@ function drawHeatmap(rawData) {
         });
     });
 
+    // Basic set up
     const heatMargin = { top: height * 0.55, left: width * 0.05 };
     const cellWidth = (width * 0.55) / genres.length;
     const cellHeight = (height * 0.3) / conditions.length;
@@ -88,6 +91,7 @@ function drawHeatmap(rawData) {
         .style("font-weight", "bold")
         .text("Severity of Anxiety, Depression, OCD, and Insomnia by Favorite Genre of Music");
 
+    // Legend
     heatmapGroup.append("text")
         .attr("x", (x.range()[0] + x.range()[1]) / 2)
         .attr("y", heatMargin.top + conditions.length * cellHeight + 0.145 * height)
@@ -112,22 +116,25 @@ function drawHeatmap(rawData) {
         .style("font-size", "14px")
         .text("Favorite Music Genre");
 
+    // Calling funcs to draw it, because it can be drawn differently depending on sorting
     renderHeatmap(genres);
     renderRows(conditions);
-
     hasSorted = false; hasWaitedTenSeconds = false;
 
+    // Func to draw the graph
     function renderHeatmap(orderedGenres) {
         const newX = d3.scaleBand().domain(orderedGenres).range([heatMargin.left, heatMargin.left + orderedGenres.length * cellWidth]).padding(0.05);
 
         const genreLabels = svg.selectAll(".genreLabel")
             .data(orderedGenres, d => d);
 
+        // Animation of sorting
         genreLabels.transition()
             .duration(750)
             .attr("x", d => newX(d) + newX.bandwidth() / 2)
             .attr("transform", d => `rotate(-45, ${newX(d) + newX.bandwidth() / 2}, ${heatMargin.top + conditions.length * cellHeight + 15})`);
 
+        // Clickable row labels
         genreLabels.enter()
             .append("text")
             .attr("class", "genreLabel")
@@ -138,6 +145,7 @@ function drawHeatmap(rawData) {
             .attr("transform", d => `rotate(-45, ${newX(d) + newX.bandwidth() / 2}, ${heatMargin.top + conditions.length * cellHeight + 15})`)
             .text(d => d)
             .style("cursor", "pointer")
+            // Clicking on a label causes it to sort stuff
             .on("click", function(clickedGenre) {
                 hasSorted = true; tryRemoveInstruction();
 
@@ -158,6 +166,7 @@ function drawHeatmap(rawData) {
             .attr("width", newX.bandwidth());
     }
 
+    // Also part of drawing the graph. Separate functions for when you sort rows vs columns
     function renderRows(orderedConditions) {
         currentY = d3.scaleBand().domain(orderedConditions).range([heatMargin.top, heatMargin.top + orderedConditions.length * cellHeight]).padding(0.05);
 
@@ -173,7 +182,7 @@ function drawHeatmap(rawData) {
             .attr("y", d => currentY(d) + currentY.bandwidth() / 2);
     }
 
-    // Add condition labels with click-to-sort genres
+    // Basically the same as above
     svg.selectAll(".conditionLabel")
         .data(conditions)
         .enter()
@@ -198,6 +207,7 @@ function drawHeatmap(rawData) {
             renderHeatmap(sortedGenres);
         });
 
+    // Box to show how it can be interacted with
     const instructionBox = svg.append("g")
         .attr("class", "instruction-group");
     const boxWidth = width * 0.125;
